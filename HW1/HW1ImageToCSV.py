@@ -24,7 +24,7 @@ train_labels = []
 test_labels = []
 
 def readdata(data, labels, typeofinput):
-    siz = 784
+    siz = 32400
     datas = np.empty((0,siz)) #temporary container for input images
     if(typeofinput == 'train'):
         print('train')
@@ -72,7 +72,7 @@ def readdata(data, labels, typeofinput):
             label = 'tallbuilding'
         data = imageio.imread(d, as_gray=True) #different decompress mjpeg method, use imageio could get faster image reading speed
         pic = np.asarray(data) #add this line for io
-        pic = np.resize(pic, (28, 28))
+        pic = np.resize(pic, 180, 180))
         pic = np.reshape(pic, (-1, siz)) #add this line for io
         #print(pic.shape)
         #print(pic[0])
