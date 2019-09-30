@@ -30,7 +30,7 @@ def readdata(data, labels, typeofinput):
         print('train')
         datas = np.empty((0,siz+1))
     num_count = 0
-    pix = [];
+    pix = []
     for i in range(siz):
         if(typeofinput == 'train' and i == 0):
             pix.append('label')
