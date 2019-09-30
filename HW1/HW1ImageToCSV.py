@@ -24,7 +24,7 @@ train_labels = []
 test_labels = []
 
 def readdata(data, labels, typeofinput):
-    siz = 784
+    siz = 72600
     datas = np.empty((0,siz)) #temporary container for input images
     if(typeofinput == 'train'):
         print('train')
@@ -45,34 +45,47 @@ def readdata(data, labels, typeofinput):
         print(num_count)
         label = ''
         if(num_count <= 136):
-            label = 'bedroom'
+            #label = 'bedroom'
+            label = 0
         elif(num_count <= 416):
-            label = 'coast'
+            #label = 'coast'
+            label = 1
         elif(num_count <= 664):
-            label = 'forest'
+            #label = 'forest'
+            label = 2
         elif(num_count <= 844):
-            label = 'highway'
+            #label = 'highway'
+            label = 3
         elif(num_count <= 1072):
-            label = 'insidecity'
+            #label = 'insidecity'
+            label = 4
         elif(num_count <= 1202):
-            label = 'kitchen'
+            #label = 'kitchen'
+            label = 5
         elif(num_count <= 1411):
-            label = 'livingroom'
+            #label = 'livingroom'
+            label = 6
         elif(num_count <= 1705):
-            label = 'mountain'
+            #label = 'mountain'
+            label = 7
         elif(num_count <= 1840):
-            label = 'office'
+            #label = 'office'
+            label = 8
         elif(num_count <= 2170):
-            label = 'opencountry'
+            #label = 'opencountry'
+            label = 9
         elif(num_count <= 2382):
-            label = 'street'
+            #label = 'street'
+            label = 10
         elif(num_count <= 2543):
-            label = 'suburb'
+            #label = 'suburb'
+            label = 11
         elif(num_count <= 2819):
-            label = 'tallbuilding'
+            #label = 'tallbuilding'
+            label = 12
         data = imageio.imread(d, as_gray=True) #different decompress mjpeg method, use imageio could get faster image reading speed
         pic = np.asarray(data) #add this line for io
-        pic = np.resize(pic, (28, 28))
+        pic = np.resize(pic, (330, 220))
         pic = np.reshape(pic, (-1, siz)) #add this line for io
         #print(pic.shape)
         #print(pic[0])
