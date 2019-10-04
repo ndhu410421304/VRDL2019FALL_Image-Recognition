@@ -1,4 +1,4 @@
-#version 6
+#res152
 import torch
 import torch.nn as nn
 import torch.utils.data as data
@@ -36,6 +36,7 @@ test_size = 1040 #test data counts
 
 torch.cuda.empty_cache() # for getting more memory for computation
 torch.backends.cudnn.benchmark = True
+dtype = torch.cuda.FloatTensor
 
 ori_acc = 0 #for comparison
 
@@ -134,12 +135,12 @@ class NetWork(nn.Module): #network structure
         prob = F.softmax(out, dim=1) #do softmax, then output
         return out
 
-model2 = NetWork(input_size, hid_size1, hid_size2, hid_size3, hid_size4, num_classes).cuda() #initial network class member, using cuda to accelerate
+model2 = NetWork(input_size, hid_size1, hid_size2, hid_size3, hid_size4, num_classes).type(dtype).cuda() #initial network class member, using cuda to accelerate
 '''
-model2 = models.resnet18(pretrained=True)
+model2 = models.resnet152(pretrained=True).type(dtype).cuda()
 features = model2.fc.in_features
-model2.fc = nn.Linear(features, 13)
-criterion = nn.CrossEntropyLoss()  # use crossentropy for loss function
+model2.fc = nn.Linear(features, 13).type(dtype).cuda()
+criterion = nn.CrossEntropyLoss().type(dtype).cuda()  # use crossentropy for loss function
 optimizer = torch.optim.Adam(model2.parameters(), lr=learning_rate) #se adam as optimizer
 
 print("Read:    --- %s seconds ---" % (time.time() - start_time)) #print time use fir reading data(include pca trasform)
@@ -149,41 +150,46 @@ haccs = [] #hid accs, for observation
 hloss = [] #hid loss, for observation
 for epoch in range(num_epochs):
     print(epoch)
+    trainloss = []
+    batchcorrect = []
     for i, (data, label) in enumerate(trainloader): #batch input data from dataloader
         if(i < (num/batch_size)-1):
             #print("ep"+str(i))
-            trainloss = []
             
-            #data = Variable(data.view(-1,1,224,224),requires_grad=False).cuda() #reshape data we get from data loader for cnn
+            
+            #data = Variable(data.view(-1,1,224,224),requires_grad=False).type(dtype).cuda() #reshape data we get from data loader for cnn
             labels = Variable(label.long(),requires_grad=False).cuda() #use long to avoid RuntimeError: Expected object of scalar type Long but got scalar type Float for argument #2 'target'
             optimizer.zero_grad() #clear optimizer's grad
-            outputs = model2(data).cuda() #get prediction from model
-            #outputcuda = outputs.cuda()
+            outputs = model2(data.type(dtype)).type(dtype).cuda() #get prediction from model
+            #outputcuda = outputs.type(dtype).cuda()
             #print(outputs.shape[0])
             
-            #labels = label.view(outputs.shape[0]).cuda() #for batch size beside set ones
-            #labels = labels.view(outputs.shape[0]).cuda() #for batch size beside set ones
+            #labels = label.view(outputs.shape[0]).type(dtype).cuda() #for batch size beside set ones
+            #labels = labels.view(outputs.shape[0]).type(dtype).cuda() #for batch size beside set ones
 
             loss = criterion(outputs, labels) #get this epoch's loss
             #loss = criterion(outputs, labels) #get this epoch's loss
             loss.backward() #back propagation
             optimizer.step() #optimizer optimize
             
-            labelc = Variable(label.float(),requires_grad=False).cuda() #duplicate label
+            labelc = Variable(label.float(),requires_grad=False).type(dtype).cuda() #duplicate label
             
             trainloss.append(loss.item()) #for calculate loss
             
             model2.eval() #evaluation mode
-            correct = (outputs == labelc).sum() #calculate correct items
+            correct = (outputs == labelc).sum() #calculate correct 'items'
+            batchcorrect.append((torch.sum(torch.argmax(outputs,dim=1)==labels) * 100).float()) #calculate mean, must use float instead of long
 
             if i == 214: #2800 / 300 = 9.xx > 9
             #if i == 1: #2800 / 300 = 9.xx > 9
-                correct = torch.sum(torch.argmax(outputs,dim=1)==labels) # count the correct classification
-                print ('Epoch: [%d/%d], Loss: %.4f, Accuracy: %.2f'
-                        % (epoch+1, num_epochs, np.mean(trainloss), (correct * 100 / outputs.shape[0]))) #for our observation
                 haccs.append(np.mean(trainloss))
                 hloss.append((correct * 100 / outputs.shape[0]))
-                if (epoch) % 5 == 0 and (epoch) != 0: #last epoch in one loop
+                correct = torch.sum(torch.argmax(outputs,dim=1)==labels) # count the correct classification
+                #print ('Epoch: [%d/%d], Loss: %.4f, Accuracy: %.2f'
+                #        % (epoch+1, num_epochs, np.mean(trainloss), (correct * 100 / outputs.shape[0]))) #for our observation
+                print ('Epoch: [%d/%d], Loss: %.4f, Accuracy: %.2f'
+                        % (epoch+1, num_epochs, np.mean(trainloss), (torch.mean(torch.stack(batchcorrect), dim=0) / outputs.shape[0]))) #for our observation                 
+                if (epoch+1) % 10 == 0 and (epoch) != 0: #last epoch in one loop
                 #if epoch == 0: #last epoch in one loop
                     with torch.no_grad(): # disable auto-grad
                         model3 = copy.deepcopy(model2) #copy model from current model and set it on cuda, for prevent to much thing in gpu
@@ -223,24 +229,24 @@ for epoch in range(num_epochs):
                         output2 = pd.DataFrame({"samp_id": range(1, len(haccsarray)+1), "loss": hlossarray, "acc": haccsarray})
                         output2.to_csv('hidobs(%d).csv'%(epoch+1), columns=["samp_id", "loss", "acc"], index=False) #output result to csv for observatio
 
-                        torch.save(model2, 'hid_net(%d).pt'%((epoch))) #save model
+                        torch.save(model2, 'hid_net(%d).pt'%((epoch+1))) #save model
                         print("--- %s seconds ---" % (time.time() - start_time)) #print total use time, originally use for observe performance
 
 print("Train:   --- %s seconds ---" % (time.time() - mid_time)) #print time use for training model
 mid_time2 = time.time()
 
 #these part were originally use for output, but when we do infinite we dont need this   
-model2 = model2.cuda() #put model on cuda when we are going to ouptu result to save moemory space
+model2 = model2.type(dtype).cuda() #put model on cuda when we are going to ouptu result to save moemory space
 
 #basically same as output part in the infinite loop
 with torch.no_grad(): # disable auto-grad
     for i, (data) in enumerate(testloader):
-        data = Variable(data,requires_grad=False).cuda() #change data format
+        data = Variable(data,requires_grad=False).type(dtype).cuda() #change data format
         
-        outputs = model2(data).cuda() #get prediction
+        outputs = model2(data).type(dtype).cuda() #get prediction
         outputs = outputs.detach() #flatten 
         out, index = torch.max(outputs,1)
-        indexc = index.cuda() #put in cuda
+        indexc = index.type(dtype).cuda() #put in cuda
         indexc = indexc.numpy() #change format for output
         testy = indexc
 
