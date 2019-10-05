@@ -1,4 +1,4 @@
-#res152
+#googlenet
 import torch
 import torch.nn as nn
 import torch.utils.data as data
@@ -137,7 +137,7 @@ class NetWork(nn.Module): #network structure
 
 model2 = NetWork(input_size, hid_size1, hid_size2, hid_size3, hid_size4, num_classes).type(dtype).cuda() #initial network class member, using cuda to accelerate
 '''
-model2 = models.resnet152(pretrained=True).type(dtype).cuda()
+model2 = models.googlenet(pretrained=True).type(dtype).cuda()
 features = model2.fc.in_features
 model2.fc = nn.Linear(features, 13).type(dtype).cuda()
 criterion = nn.CrossEntropyLoss().type(dtype).cuda()  # use crossentropy for loss function
