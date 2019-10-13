@@ -1,4 +1,4 @@
-#remove horizontal, rot to 5
+#resnext 101 32x8d rot5
 import torch
 import torch.nn as nn
 import torch.utils.data as data
@@ -44,7 +44,7 @@ data_transforms = {
     'train': transforms.Compose([
         transforms.RandomResizedCrop(224),
         transforms.RandomHorizontalFlip(),
-        transforms.RandomRotation(10),
+        transforms.RandomRotation(5),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ]),
@@ -138,7 +138,7 @@ class NetWork(nn.Module): #network structure
 
 model2 = NetWork(input_size, hid_size1, hid_size2, hid_size3, hid_size4, num_classes).type(dtype).cuda() #initial network class member, using cuda to accelerate
 '''
-model2 = models.wide_resnet101_2(pretrained=True).cuda()
+model2 = models.resnext101_32x8d(pretrained=True).cuda()
 features = model2.fc.in_features
 model2.fc = nn.Linear(features, 13).type(dtype).cuda()
 print(model2)
