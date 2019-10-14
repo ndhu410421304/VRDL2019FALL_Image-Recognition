@@ -1,4 +1,4 @@
-#resnext 101 32x8d rot5
+#densenet201 rot5
 import torch
 import torch.nn as nn
 import torch.utils.data as data
@@ -138,9 +138,9 @@ class NetWork(nn.Module): #network structure
 
 model2 = NetWork(input_size, hid_size1, hid_size2, hid_size3, hid_size4, num_classes).type(dtype).cuda() #initial network class member, using cuda to accelerate
 '''
-model2 = models.resnext101_32x8d(pretrained=True).cuda()
-features = model2.fc.in_features
-model2.fc = nn.Linear(features, 13).type(dtype).cuda()
+model2 = models.densenet201(pretrained=True).cuda()
+features = model2.classifier.in_features
+model2.classifier = nn.Linear(features, 13).type(dtype).cuda()
 print(model2)
 
 criterion = nn.CrossEntropyLoss().type(dtype).cuda()  # use crossentropy for loss function
