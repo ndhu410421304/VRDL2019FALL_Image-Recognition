@@ -1,4 +1,4 @@
-# MODIFY classifier, resize
+# Clearing and formatting code under PEP8
 import torch
 import torch.nn as nn
 import torch.utils.data as data
@@ -15,24 +15,28 @@ import copy as copy
 import time
 import os
 
-start_time = time.time()  # calculate time
+START_TIME = time.time()  # Calculate time
 
 TRAIN_DATA_SIZE = 2819
 NUM_CLASSES = 13
-NUM_EPOCHS = 50000  # set a big enough number for running unstop
+NUM_EPOCHS = 50000  # Set a big enough number for running unstop
 BATCH_SIZE = 13
 LEARNING_RATE = 0.00001
 TEST_DATA_SIZE = 1040
-ori_acc = 0  # for comparison
 
-torch.cuda.empty_cache()  # for getting more memory for computation
+torch.cuda.empty_cache()  # For getting more memory for computation
 torch.backends.cudnn.benchmark = True
-dtype = torch.cuda.FloatTensor
+gpu_accept_type = torch.cuda.FloatTensor
 
 data_transforms = {
     'train': transforms.Compose([
-        # Doing data augmentation here
-        # transforms.RandomRotation(5) can also apply if want
+        # Doing data augmentation here:
+        # Jitter some color, random apply rotation,
+        # radomlize image perspective,
+        # random resize image and crop to size 224,
+        # random flip tjhe image then transform
+        # to tensor, and
+        # normalize at last step.
         transforms.ColorJitter(0.15, 0.15, 0.15, 0),
         transforms.RandomRotation(5),
         transforms.RandomPerspective(),
@@ -49,8 +53,7 @@ data_transforms = {
     ]),
 }
 
-print('train')
-
+''' Load data from dataset '''
 data_dir = 'dataset'
 traindata = datasets.ImageFolder(
     os.path.join(data_dir, 'train'), data_transforms['train'])
@@ -62,184 +65,211 @@ testloader = torch.utils.data.DataLoader(
     testdata, batch_size=TEST_DATA_SIZE, shuffle=False, num_workers=0)
 class_names = traindata.classes
 
-model2 = models.densenet201(pretrained=True).cuda()
-features = model2.classifier.in_features
-model2.classifier = nn.Sequential(
+print('train')  # Check if program works
+
+''' Load data to model with modification '''
+Model = models.densenet201(pretrained=True).cuda()
+features = Model.classifier.in_features
+Model.classifier = nn.Sequential(
     nn.Linear(1920, 960, bias = True),
     nn.ReLU(),
     nn.Dropout(0.5),
     nn.Linear(960, 960),
     nn.ReLU(),
     nn.Dropout(0.5),
-    nn.Linear(960, 13)).type(dtype).cuda()
-print(model2)
+    nn.Linear(960, 13)).type(gpu_accept_type).cuda()
+print(Model)  # Print model shape
 
 criterion = nn.CrossEntropyLoss(
-    ).type(dtype).cuda()  # use crossentropy for loss function
+    ).type(gpu_accept_type).cuda()  # Use crossentropy for loss function
 optimizer = torch.optim.Adam(
-    model2.parameters(), lr=LEARNING_RATE)  # use adam as optimizer
+    Model.parameters(), lr=LEARNING_RATE)  # Use adam as optimizer
 
 print("Read:    --- %s seconds ---" % (
-    time.time() - start_time))  # print time for reading data
-mid_time = time.time()
+    time.time() - START_TIME))  # Print time for reading data
+MID_TIME = time.time()
 
-haccs = []  # hid accs, for observation
-hloss = []  # hid loss, for observation
+model_accuracy = []  # Model accuracy recorded for observation
+
+
 for epoch in range(NUM_EPOCHS):
     print(epoch)
-    trainloss = []
-    batchcorrect = []
-    for i, (data, label) in enumerate(
-            trainloader):  # batch input data from dataloader
-        if(i < (TRAIN_DATA_SIZE/BATCH_SIZE)-1):
-            # use long to avoid RuntimeError: Expected object of
+    train_loss = []
+    batch_correct = []
+    for train_batch_num, (data, label) in enumerate(
+            trainloader):  # Batch input data from dataloader
+        if(train_batch_num < (TRAIN_DATA_SIZE/BATCH_SIZE)-1):
+            # Use long to avoid RuntimeError: Expected object of
             # scalar type Long but got scalar type Float for
             # argument #2 'target'
-            labels = Variable(
+            label_long = Variable(
                 label.long(), requires_grad=False).cuda()
-            optimizer.zero_grad()  # clear optimizer's grad
-            # get prediction from model
-            outputs = model2(data.type(dtype)).type(dtype).cuda()
-            loss = criterion(outputs, labels)  # get this epoch's loss
-            loss.backward()  # back propagation
-            optimizer.step()  # optimizer optimize
-            # duplicate label
-            labelc = Variable(
-                label.float(), requires_grad=False).type(dtype).cuda()
-            trainloss.append(loss.item())  # for calculate loss
-            model2.eval()  # evaluation mode
-            correct = (outputs == labelc).sum()  # calculate correct 'items'
-            # calculate mean, must use float instead of long
-            batchcorrect.append((torch.sum(
-                torch.argmax(outputs, dim=1) == labels) * 100).float())
+            optimizer.zero_grad()  # Clear optimizer's grad
 
-            if i == 214:  # 2800 / 300 = 9.xx > 9
-                haccs.append(np.mean(trainloss))
-                hloss.append((correct * 100 / outputs.shape[0]))
-                # count the correct classification
-                correct = torch.sum(torch.argmax(outputs, dim=1) == labels)
-                # for our observation
+            ''' Get prediction from model '''
+            model_output = Model(data.type(gpu_accept_type)).type(gpu_accept_type).cuda()
+            loss = criterion(model_output, label_long)  # Get this epoch's loss
+            loss.backward()  # Back propagation
+            optimizer.step()  # Optimizer optimize
+            # Duplicate label
+            label_float = Variable(
+                label.float(), requires_grad=False).type(gpu_accept_type).cuda()
+            train_loss.append(loss.item())  # For calculate loss
+            Model.eval()  # Evaluation mode
+            correct_item = (model_output == label_float).sum()  # Calculate correct 'items'
+            # calculate mean, must use float instead of long
+            batch_correct.append((torch.sum(
+                torch.argmax(model_output, dim=1) == label_long) * 100).float())
+
+            ''' Output current model prediction in a period '''
+            if train_batch_num == 214:  # Near the last epoch
+                model_accuracy.append(np.mean(train_loss))
+                # Count the correct classification
+                correct_item = torch.sum(torch.argmax(model_output, dim=1) == label_long)
+                # For our observation
                 print(
                     'Epoch: [%d/%d], Loss: %.4f, Accuracy: %.2f' % (
                         epoch+1, NUM_EPOCHS,
-                        np.mean(trainloss), (torch.mean(torch.stack(
-                            batchcorrect), dim=0) / outputs.shape[0])))
-                if (epoch+1) % 5 == 0 and (epoch) != 0:  # last epoch in loop
-                    with torch.no_grad():  # disable auto-grad
-                        # copy model from current model and
+                        np.mean(train_loss), (torch.mean(torch.stack(
+                            batch_correct), dim=0) / model_output.shape[0])))
+
+                ''' Save current model prediction in a period '''
+                if (epoch+1) % 5 == 0 and (epoch) != 0:  # Save every five epoch
+                    with torch.no_grad():  # Disable auto-grad
+                        # Copy model from current model and
                         # set it on cuda, for prevent to much thing in gpu
-                        model3 = copy.deepcopy(model2)
-                        model3 = model3.cpu()  # set on cpu
-                        # load test data #drop label
-                        for i, (data, label) in enumerate(testloader):
-                            # transfer format to Variable for network
+                        Model_CPU = copy.deepcopy(Model)
+                        Model_CPU = Model_CPU.cpu()  # Set model on cpu
+
+                        ''' Load test data to predict '''
+                        for test_batch_num, (data, label) in enumerate(testloader):
+                            # Transfer format to Variable for network
                             data = Variable(data, requires_grad=False).cpu()
-                            # get prediction of test data
-                            outputs = model3(data).cpu()
-                            outputs = outputs.detach()  # flat
-                            # get predict label
-                            out, index = torch.max(outputs, 1)
+                            # Get prediction of test data
+                            model_output = Model_CPU(data).cpu()
+                            model_output = model_output.detach()  # Flat
+                            # Get predict label
+                            out, index = torch.max(model_output, 1)
                             print(out)
                             print(index)
-                            indexc = index.cpu()  # put in cuda
-                            # change format prepare for observation and output
-                            indexc = indexc.numpy()
-                            testy = indexc  # copy
-                        # transfer label back into string
-                        testy = testy.astype(np.str_)
-                        testy = np.char.replace(testy, '10', 'street')
-                        testy = np.char.replace(testy, '11', 'suburb')
-                        testy = np.char.replace(testy, '12', 'tallbuilding')
-                        testy = np.char.replace(testy, '0', 'bedroom')
-                        testy = np.char.replace(testy, '1', 'coast')
-                        testy = np.char.replace(testy, '2', 'forest')
-                        testy = np.char.replace(testy, '3', 'highway')
-                        testy = np.char.replace(testy, '4', 'insidecity')
-                        testy = np.char.replace(testy, '5', 'kitchen')
-                        testy = np.char.replace(testy, '6', 'livingroom')
-                        testy = np.char.replace(testy, '7', 'mountain')
-                        testy = np.char.replace(testy, '8', 'office')
-                        testy = np.char.replace(testy, '9', 'opencountry')
-                        # save per 100
+                            index_cpu = index.cpu()  # Put in cuda
+                            # Change format prepare for observation and output
+                            index_cpu = index_cpu.numpy()
+                            predict_label = index_cpu  # Copy
+
+                        # Transform label back into string
+                        predict_label = predict_label.astype(np.str_)
+                        predict_label = np.char.replace(
+                            predict_label, '10', 'street')
+                        predict_label = np.char.replace(
+                            predict_label, '11', 'suburb')
+                        predict_label = np.char.replace(
+                            predict_label, '12', 'tallbuilding')
+                        predict_label = np.char.replace(
+                            predict_label, '0', 'bedroom')
+                        predict_label = np.char.replace(
+                            predict_label, '1', 'coast')
+                        predict_label = np.char.replace(
+                            predict_label, '2', 'forest')
+                        predict_label = np.char.replace(
+                            predict_label, '3', 'highway')
+                        predict_label = np.char.replace(
+                            predict_label, '4', 'insidecity')
+                        predict_label = np.char.replace(
+                            predict_label, '5', 'kitchen')
+                        predict_label = np.char.replace(
+                            predict_label, '6', 'livingroom')
+                        predict_label = np.char.replace(
+                            predict_label, '7', 'mountain')
+                        predict_label = np.char.replace(
+                            predict_label, '8', 'office')
+                        predict_label = np.char.replace(
+                            predict_label, '9', 'opencountry')
+
+                        ''' Output prediction '''
                         testbuilding_name = [
                             'image_%04d' % n for n in range(0, 1039+1)]
-                        output = pd.DataFrame({
-                            "id": testbuilding_name, "label": testy})
-                        # output result to csv
-                        output.to_csv(
+                        predict_label_dataframe = pd.DataFrame({
+                            "id": testbuilding_name, "label": predict_label})
+                        # Output result to csv
+                        predict_label_dataframe.to_csv(
                             "CS_IOC5008_0856619_HW1(%d).csv" % (epoch+1),
                             columns=["id", "label"], index=False)
-                        # save data also
-                        haccsarray = np.asarray(haccs).ravel()  # save accuracy
-                        hlossarray = np.asarray(hloss).ravel()  # save loss
-                        output2 = pd.DataFrame({
-                            "samp_id": range(1, len(haccsarray)+1),
-                            "loss": hlossarray, "acc": haccsarray})
-                        # output result to csv for observatioN
-                        output2.to_csv(
+                        
+                        ''' Output recorded accuracy '''
+                        accuracy_array = np.asarray(model_accuracy).ravel()  # Save accuracy
+                        accuracy_dataframe = pd.DataFrame({
+                            "samp_id": range(1, len(accuracy_array)+1),
+                            "acc": accuracy_array})
+                        # Output result to csv for observatioN
+                        accuracy_dataframe.to_csv(
                             'hidobs(%d).csv' % (epoch+1),
                             columns=["samp_id", "loss", "acc"], index=False)
 
-                        # save model
-                        torch.save(model2, 'hid_net(%d).pt' % ((epoch+1)))
-                        # print total use time, originally use for
+                       ''' Save current Model '''
+                        torch.save(Model, 'hid_net(%d).pt' % ((epoch+1)))
+
+                        # Print total use time, originally use for
                         # observe performance
                         print("--- %s seconds ---" % (
-                            time.time() - start_time))
+                            time.time() - START_TIME))
 
-# print time use for training model
+# Print time use for training model
 print("Train:   --- %s seconds ---" % (
-    time.time() - mid_time))
-mid_time2 = time.time()
+    time.time() - MID_TIME))
+MID_TIME2 = time.time()
 
-# these part were originally use for output, but
-# when we do infinite we dont need this
+# These part were used for output
+# when training process is done, which is
+# reach the last epoch.
+# But we can stop training in early stage
+# if we think it's alreay converge.
 #
-# put model on cuda when we are going to
-# ouptuT result to save moemory space
-model2 = model2.type(dtype).cuda()
+# Put model on cpu when we are going to
+# ouptut result to save moemory space
+Model = Model.type(gpu_accept_type).cpu()
 
-# basically same as output part in the infinite loop
-with torch.no_grad():  # disable auto-grad
-    for i, (data) in enumerate(testloader):
-        # change data format
+''' Output final prediction '''
+with torch.no_grad():  # Disable auto-grad
+    for test_batch_num, (data) in enumerate(testloader):
+        # Change data format
         data = Variable(
-            data, requires_grad=False).type(dtype).cuda()
-        # get prediction
-        outputs = model2(data).type(dtype).cuda()
-        outputs = outputs.detach()  # flatten
-        out, index = torch.max(outputs, 1)
-        indexc = index.type(dtype).cuda()  # put in cuda
-        indexc = indexc.numpy()  # change format for output
-        testy = indexc
+            data, requires_grad=False).type(gpu_accept_type).cpu()
+        # Get prediction
+        model_output = Model(data).type(gpu_accept_type).cpu()
+        model_output = model_output.detach()  # Flatten
+        out, index = torch.max(model_output, 1)
+        index_cpu = index.type(gpu_accept_type).cpu()  # Put in cuda
+        index_cpu = index_cpu.numpy()  # Change format for output
+        predict_label = index_cpu
 
-# print time model use for doing prediction
-print("Predict:--- %s seconds ---" % (time.time() - mid_time2))
+# Print time model use for doing prediction
+print("Predict:--- %s seconds ---" % (time.time() - MID_TIME2))
 
 # change back to building name
-testy = testy.astype(np.str_)
-testy = np.char.replace(testy, '10', 'street')
-testy = np.char.replace(testy, '11', 'suburb')
-testy = np.char.replace(testy, '12', 'tallbuilding')
-testy = np.char.replace(testy, '0', 'bedroom')
-testy = np.char.replace(testy, '1', 'coast')
-testy = np.char.replace(testy, '2', 'forest')
-testy = np.char.replace(testy, '3', 'highway')
-testy = np.char.replace(testy, '4', 'insidecity')
-testy = np.char.replace(testy, '5', 'kitchen')
-testy = np.char.replace(testy, '6', 'livingroom')
-testy = np.char.replace(testy, '7', 'mountain')
-testy = np.char.replace(testy, '8', 'office')
-testy = np.char.replace(testy, '9', 'opencountry')
+predict_label = predict_label.astype(np.str_)
+predict_label = np.char.replace(predict_label, '10', 'street')
+predict_label = np.char.replace(predict_label, '11', 'suburb')
+predict_label = np.char.replace(predict_label, '12', 'tallbuilding')
+predict_label = np.char.replace(predict_label, '0', 'bedroom')
+predict_label = np.char.replace(predict_label, '1', 'coast')
+predict_label = np.char.replace(predict_label, '2', 'forest')
+predict_label = np.char.replace(predict_label, '3', 'highway')
+predict_label = np.char.replace(predict_label, '4', 'insidecity')
+predict_label = np.char.replace(predict_label, '5', 'kitchen')
+predict_label = np.char.replace(predict_label, '6', 'livingroom')
+predict_label = np.char.replace(predict_label, '7', 'mountain')
+predict_label = np.char.replace(predict_label, '8', 'office')
+predict_label = np.char.replace(predict_label, '9', 'opencountry')
 
 testbuilding_name = [
     'image_%04d' % n for n in range(0, 1039+1)]
-output = pd.DataFrame({
-    "id": testbuilding_name, "label": testy})
-output.to_csv(
+predict_label_dataframe = pd.DataFrame({
+    "id": testbuilding_name, "label": predict_label})
+predict_label_dataframe.to_csv(
     "CS_IOC5008_0856619_HW1.csv",
-    columns=["id", "label"], index=False)  # output result to csv
+    columns=["id", "label"], index=False)  # Output result to csv
 
-torch.save(model2, 'net.pkl')  # save model
-# print total use time, originally use for observe performance
-print("--- %s seconds ---" % (time.time() - start_time))
+torch.save(Model, 'net.pkl')  # Save model
+# Print total use time, originally use for observe performance
+print("--- %s seconds ---" % (time.time() - START_TIME))
