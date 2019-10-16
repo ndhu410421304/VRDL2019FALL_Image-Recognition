@@ -1,4 +1,4 @@
-# MODIFY pep8
+# MODIFY classifier, resize
 import torch
 import torch.nn as nn
 import torch.utils.data as data
@@ -33,13 +33,16 @@ data_transforms = {
     'train': transforms.Compose([
         # Doing data augmentation here
         # transforms.RandomRotation(5) can also apply if want
+        transforms.ColorJitter(0.15, 0.15, 0.15, 0),
+        transforms.RandomRotation(5),
+        transforms.RandomPerspective(),
         transforms.RandomResizedCrop(224),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ]),
     'test': transforms.Compose([
-        transforms.Resize(256),
+        transforms.Resize(224),
         transforms.CenterCrop(224),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
@@ -62,8 +65,13 @@ class_names = traindata.classes
 model2 = models.densenet201(pretrained=True).cuda()
 features = model2.classifier.in_features
 model2.classifier = nn.Sequential(
-    nn.Linear(1920, 960), nn.Linear(960, 480),
-    nn.Linear(480, 13)).type(dtype).cuda()
+    nn.Linear(1920, 960, bias = True),
+    nn.ReLU(),
+    nn.Dropout(0.5),
+    nn.Linear(960, 960),
+    nn.ReLU(),
+    nn.Dropout(0.5),
+    nn.Linear(960, 13)).type(dtype).cuda()
 print(model2)
 
 criterion = nn.CrossEntropyLoss(
@@ -116,7 +124,7 @@ for epoch in range(NUM_EPOCHS):
                         epoch+1, NUM_EPOCHS,
                         np.mean(trainloss), (torch.mean(torch.stack(
                             batchcorrect), dim=0) / outputs.shape[0])))
-                if (epoch+1) % 10 == 0 and (epoch) != 0:  # last epoch in loop
+                if (epoch+1) % 5 == 0 and (epoch) != 0:  # last epoch in loop
                     with torch.no_grad():  # disable auto-grad
                         # copy model from current model and
                         # set it on cuda, for prevent to much thing in gpu
