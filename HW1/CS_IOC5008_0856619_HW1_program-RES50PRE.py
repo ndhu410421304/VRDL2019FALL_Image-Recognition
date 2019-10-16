@@ -1,4 +1,4 @@
-# Clearing and formatting code under PEP8
+# Formatting code under PEP8
 import torch
 import torch.nn as nn
 import torch.utils.data as data
@@ -71,7 +71,7 @@ print('train')  # Check if program works
 Model = models.densenet201(pretrained=True).cuda()
 features = Model.classifier.in_features
 Model.classifier = nn.Sequential(
-    nn.Linear(1920, 960, bias = True),
+    nn.Linear(1920, 960, bias=True),
     nn.ReLU(),
     nn.Dropout(0.5),
     nn.Linear(960, 960),
@@ -107,25 +107,30 @@ for epoch in range(NUM_EPOCHS):
             optimizer.zero_grad()  # Clear optimizer's grad
 
             ''' Get prediction from model '''
-            model_output = Model(data.type(gpu_accept_type)).type(gpu_accept_type).cuda()
+            model_output = Model(
+                data.type(gpu_accept_type)).type(gpu_accept_type).cuda()
             loss = criterion(model_output, label_long)  # Get this epoch's loss
             loss.backward()  # Back propagation
             optimizer.step()  # Optimizer optimize
             # Duplicate label
             label_float = Variable(
-                label.float(), requires_grad=False).type(gpu_accept_type).cuda()
+                label.float(),
+                requires_grad=False).type(gpu_accept_type).cuda()
             train_loss.append(loss.item())  # For calculate loss
             Model.eval()  # Evaluation mode
-            correct_item = (model_output == label_float).sum()  # Calculate correct 'items'
+            # Calculate correct 'items'
+            correct_item = (model_output == label_float).sum()
             # calculate mean, must use float instead of long
             batch_correct.append((torch.sum(
-                torch.argmax(model_output, dim=1) == label_long) * 100).float())
+                torch.argmax(
+                    model_output, dim=1) == label_long) * 100).float())
 
             ''' Output current model prediction in a period '''
             if train_batch_num == 214:  # Near the last epoch
                 model_accuracy.append(np.mean(train_loss))
                 # Count the correct classification
-                correct_item = torch.sum(torch.argmax(model_output, dim=1) == label_long)
+                correct_item = torch.sum(
+                    torch.argmax(model_output, dim=1) == label_long)
                 # For our observation
                 print(
                     'Epoch: [%d/%d], Loss: %.4f, Accuracy: %.2f' % (
@@ -134,7 +139,7 @@ for epoch in range(NUM_EPOCHS):
                             batch_correct), dim=0) / model_output.shape[0])))
 
                 ''' Save current model prediction in a period '''
-                if (epoch+1) % 5 == 0 and (epoch) != 0:  # Save every five epoch
+                if (epoch+1) % 5 == 0 and (epoch) != 0:  # Every five epoch
                     with torch.no_grad():  # Disable auto-grad
                         # Copy model from current model and
                         # set it on cuda, for prevent to much thing in gpu
@@ -142,7 +147,8 @@ for epoch in range(NUM_EPOCHS):
                         Model_CPU = Model_CPU.cpu()  # Set model on cpu
 
                         ''' Load test data to predict '''
-                        for test_batch_num, (data, label) in enumerate(testloader):
+                        for test_batch_num, (
+                                data, label) in enumerate(testloader):
                             # Transfer format to Variable for network
                             data = Variable(data, requires_grad=False).cpu()
                             # Get prediction of test data
@@ -195,9 +201,10 @@ for epoch in range(NUM_EPOCHS):
                         predict_label_dataframe.to_csv(
                             "CS_IOC5008_0856619_HW1(%d).csv" % (epoch+1),
                             columns=["id", "label"], index=False)
-                        
+
                         ''' Output recorded accuracy '''
-                        accuracy_array = np.asarray(model_accuracy).ravel()  # Save accuracy
+                        accuracy_array = np.asarray(
+                            model_accuracy).ravel()  # Save accuracy
                         accuracy_dataframe = pd.DataFrame({
                             "samp_id": range(1, len(accuracy_array)+1),
                             "acc": accuracy_array})
@@ -206,7 +213,7 @@ for epoch in range(NUM_EPOCHS):
                             'hidobs(%d).csv' % (epoch+1),
                             columns=["samp_id", "loss", "acc"], index=False)
 
-                       ''' Save current Model '''
+                        ''' Save current Model '''
                         torch.save(Model, 'hid_net(%d).pt' % ((epoch+1)))
 
                         # Print total use time, originally use for
