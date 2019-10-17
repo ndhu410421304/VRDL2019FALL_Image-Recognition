@@ -1,4 +1,7 @@
 # Clearing and formatting code under PEP8
+#
+# CSV of train and test data were save by
+# more older version of code.
 import torch
 import torch.nn as nn
 import torch.utils.data as data
